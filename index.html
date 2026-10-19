@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>海螺剪輯器</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">🐚 海螺剪輯器</div>
+  <div class="top-actions">
+    <button id="btnOpenProject" title="開啟 .hlproj 專案檔">📂 開啟專案</button>
+    <button id="btnSaveProject" title="把時間軸與用到的素材存成 .hlproj 專案檔">💾 儲存專案</button>
+    <button id="btnUndo" title="復原 (Ctrl/⌘+Z)">↶ 復原</button>
+    <button id="btnRedo" title="重做 (Ctrl/⌘+Shift+Z)">↷ 重做</button>
+    <label class="inline">畫面比例
+      <select id="aspectSelect">
+        <option value="16:9">16:9 橫式</option>
+        <option value="9:16">9:16 直式</option>
+        <option value="1:1">1:1 方形</option>
+      </select>
+    </label>
+    <button id="btnRecord" title="錄製螢幕或視窗，錄完自動加入素材">🎥 錄製畫面</button>
+    <button id="btnExportSrt">匯出字幕 SRT</button>
+    <button id="btnExport" class="primary">⬇ 匯出影片</button>
+  </div>
+</header>
+
+<main class="workspace">
+  <!-- 素材管理區 -->
+  <section class="panel library">
+    <nav class="tabs" id="libTabs">
+      <button data-tab="media" class="active">媒體</button>
+      <button data-tab="builtin">預設素材</button>
+      <button data-tab="audio">音樂</button>
+      <button data-tab="text">文字</button>
+      <button data-tab="effects">特效</button>
+    </nav>
+    <div class="tab-body">
+      <div class="tab-page active" data-page="media">
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" multiple accept="video/*,image/*,audio/*,.mkv,.mov,.ttf,.otf,.woff,.woff2,.cube,.json,.hlproj" hidden />
+          <div>📁 點擊或拖曳檔案到這裡</div>
+          <small>影片、圖片、GIF、音訊<br>也可直接丟字型、LUT (.cube)、文字範本 (.json)</small>
+        </label>
+        <div class="url-row">
+          <input type="text" id="urlInput" placeholder="或貼上檔案網址 https://…" />
+          <button id="urlBtn">載入</button>
+        </div>
+        <button id="btnRecordLib" class="rec-lib-btn">🎥 錄製螢幕 / 視窗</button>
+        <div class="asset-grid" id="mediaGrid"></div>
+      </div>
+      <div class="tab-page" data-page="builtin">
+        <h4>動態影片素材</h4>
+        <div class="asset-grid" id="genGrid"></div>
+        <h4>圖片 / 背景 / 貼圖</h4>
+        <div class="asset-grid" id="imageGrid"></div>
+      </div>
+      <div class="tab-page" data-page="audio">
+        <h4>背景音樂</h4>
+        <div class="asset-list" id="musicList"></div>
+        <h4>音效</h4>
+        <div class="asset-list" id="sfxList"></div>
+      </div>
+      <div class="tab-page" data-page="text">
+        <h4>文字樣式範本</h4>
+        <div class="asset-grid text-grid" id="textGrid"></div>
+        <h4 class="h-actions">我的範本 <span><button id="btnImportPreset">匯入</button><button id="btnExportPreset">匯出</button></span></h4>
+        <div class="asset-grid text-grid" id="userTextGrid"></div>
+        <h4 class="h-actions">字型 <span><button id="btnImportFont">＋ 匯入字型</button></span></h4>
+        <div class="asset-list" id="fontList"></div>
+        <h4>文字特效（選取文字後套用）</h4>
+        <div class="chip-list" id="textAnimList"></div>
+      </div>
+      <div class="tab-page" data-page="effects">
+        <h4>畫面特效（加到特效軌）</h4>
+        <div class="asset-grid" id="fxGrid"></div>
+        <h4 class="h-actions">我的特效素材 <span><button id="btnImportFx">＋ 匯入檔案</button><button id="btnFxUrl">網址</button></span></h4>
+        <div class="asset-grid" id="fxMediaGrid"></div>
+        <h4>濾鏡（選取片段後套用）</h4>
+        <div class="chip-list" id="filterList"></div>
+        <h4 class="h-actions">LUT 調色濾鏡 <span><button id="btnImportLut">＋ 匯入 .cube</button></span></h4>
+        <div class="asset-list" id="lutList"></div>
+      </div>
+    </div>
+    <p class="hint">提示：拖曳素材到下方時間軸，或點素材上的「＋」加到播放頭位置。</p>
+  </section>
+
+  <!-- 預覽區 -->
+  <section class="panel preview">
+    <div class="stage-wrap" id="stageWrap">
+      <canvas id="stage" width="1280" height="720"></canvas>
+    </div>
+    <div class="transport">
+      <button id="btnToStart" title="回到開頭 (Home)">⏮</button>
+      <button id="btnPlay" class="play" title="播放 / 暫停 (空白鍵)">▶</button>
+      <button id="btnToEnd" title="跳到結尾 (End)">⏭</button>
+      <span class="timecode"><span id="tcNow">00:00.00</span> / <span id="tcTotal">00:00.00</span></span>
+      <span class="spacer"></span>
+      <label class="inline">主音量 <input type="range" id="masterVol" min="0" max="1.5" step="0.01" value="1" /></label>
+    </div>
+  </section>
+
+  <!-- 右側：屬性 + 字幕 -->
+  <section class="panel side">
+    <nav class="tabs" id="sideTabs">
+      <button data-tab="props" class="active">屬性</button>
+      <button data-tab="subs">字幕打點</button>
+    </nav>
+    <div class="tab-body">
+      <div class="tab-page active" data-page="props"><div id="inspector"></div></div>
+      <div class="tab-page" data-page="subs"><div id="subtitlePanel"></div></div>
+    </div>
+  </section>
+</main>
+
+<!-- 時間軸 -->
+<section class="timeline-area">
+  <div class="tl-toolbar">
+    <button id="btnSplit" title="在播放頭分割 (S)">✂ 分割</button>
+    <button id="btnDelete" title="刪除選取 (Delete)">🗑 刪除</button>
+    <button id="btnDuplicate" title="複製片段 (Ctrl/⌘+D)">⧉ 複製</button>
+    <button id="btnDetachAudio" title="將原聲靜音並準備替換背景音">🔇 移除原聲</button>
+    <span class="spacer"></span>
+    <label class="inline"><input type="checkbox" id="snapToggle" checked /> 吸附</label>
+    <label class="inline">縮放 <input type="range" id="zoom" min="10" max="300" value="70" /></label>
+  </div>
+  <div class="timeline" id="timeline">
+    <div class="tl-heads" id="tlHeads"></div>
+    <div class="tl-scroll" id="tlScroll">
+      <div class="tl-content" id="tlContent">
+        <div class="tl-ruler" id="tlRuler"></div>
+        <div class="tl-lanes" id="tlLanes"></div>
+        <div class="tl-playhead" id="tlPlayhead"><div class="knob"></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="hiddenMedia" class="hidden-media"></div>
+<input type="file" id="fontInput" accept=".ttf,.otf,.woff,.woff2" multiple hidden />
+<input type="file" id="presetInput" accept=".json,application/json" multiple hidden />
+<input type="file" id="fxInput" accept="video/*,image/*,.mov,.webm" multiple hidden />
+<input type="file" id="lutInput" accept=".cube" multiple hidden />
+<div id="toast" class="toast"></div>
+<div id="modal" class="modal hidden"><div class="modal-card" id="modalCard"></div></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
